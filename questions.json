@@ -1,0 +1,46 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "subject": "Mathematics",
+      "topic": "Algebra",
+      "question": "What is the value of x in the equation 2x + 5 = 13?",
+      "options": [
+        "x = 3",
+        "x = 4",
+        "x = 5",
+        "x = 6"
+      ],
+      "correct_answer": 1,
+      "explanation": "2x + 5 = 13\n2x = 13 - 5\n2x = 8\nx = 4"
+    },
+    {
+      "id": 2,
+      "subject": "Science",
+      "topic": "Physics",
+      "question": "Which of the following is the SI unit of force?",
+      "options": [
+        "Watt",
+        "Joule",
+        "Newton",
+        "Pascal"
+      ],
+      "correct_answer": 2,
+      "explanation": "The SI unit of force is Newton (N), named after Sir Isaac Newton."
+    },
+    {
+      "id": 3,
+      "subject": "English",
+      "topic": "Grammar",
+      "question": "Which of these is a correct use of semicolon?",
+      "options": [
+        "I love cooking; my brother does too.",
+        "I love cooking; and my brother.",
+        "I love; cooking my brother does too.",
+        "I love cooking; because my brother does."
+      ],
+      "correct_answer": 0,
+      "explanation": "A semicolon is used to join two independent clauses that are closely related in meaning."
+    }
+  ]
+}

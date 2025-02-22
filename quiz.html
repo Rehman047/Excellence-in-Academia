@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Practice Quiz{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card question-card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Question <span id="questionNumber">1</span></h3>
+                    <div class="progress-info">
+                        <span id="progressText">1 of 5</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="questionContent">
+                        <p class="question-text" id="questionText"></p>
+                        <div class="options" id="optionsContainer"></div>
+                    </div>
+                    
+                    <div id="explanation" class="mt-4 d-none">
+                        <div class="alert alert-info">
+                            <h5>Explanation:</h5>
+                            <p id="explanationText"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <button id="checkAnswer" class="btn btn-primary">Check Answer</button>
+                        <button id="nextQuestion" class="btn btn-success d-none">Next Question</button>
+                        <button id="submitQuiz" class="btn btn-success d-none">Submit Quiz</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentQuestions = JSON.parse(sessionStorage.getItem('questions') || '[]');
+    let currentIndex = 0;
+    let userAnswers = new Array(currentQuestions.length).fill(null);
+
+    function displayQuestion(index) {
+        const question = currentQuestions[index];
+        document.getElementById('questionNumber').textContent = index + 1;
+        document.getElementById('progressText').textContent = `${index + 1} of ${currentQuestions.length}`;
+        document.getElementById('questionText').textContent = question.question;
+        
+        const optionsContainer = document.getElementById('optionsContainer');
+        optionsContainer.innerHTML = question.options.map((option, i) => `
+            <div class="form-check option-item mb-2">
+                <input class="form-check-input" type="radio" name="answer" value="${i}" id="option${i}">
+                <label class="form-check-label" for="option${i}">${option}</label>
+            </div>
+        `).join('');
+
+        document.getElementById('explanation').classList.add('d-none');
+        document.getElementById('checkAnswer').classList.remove('d-none');
+        document.getElementById('nextQuestion').classList.add('d-none');
+        document.getElementById('finishQuiz').classList.add('d-none');
+    }
+
+    function checkAnswer() {
+        const selectedOption = document.querySelector('input[name="answer"]:checked');
+        if (!selectedOption) {
+            alert('Please select an answer');
+            return;
+        }
+
+        const question = currentQuestions[currentIndex];
+        const userAnswer = parseInt(selectedOption.value);
+        userAnswers[currentIndex] = userAnswer;
+
+        // Disable all options
+        document.querySelectorAll('input[name="answer"]').forEach(input => input.disabled = true);
+
+        // Show explanation
+        document.getElementById('explanation').classList.remove('d-none');
+        document.getElementById('explanationText').textContent = question.explanation;
+
+        // Highlight correct and incorrect answers
+        document.querySelectorAll('.option-item').forEach((item, index) => {
+            if (index === question.correct_answer) {
+                item.classList.add('correct-answer');
+            } else if (index === userAnswer && userAnswer !== question.correct_answer) {
+                item.classList.add('incorrect-answer');
+            }
+        });
+
+        // Show next/submit button based on question index
+        document.getElementById('checkAnswer').classList.add('d-none');
+        if (currentIndex < currentQuestions.length - 1) {
+            document.getElementById('nextQuestion').classList.remove('d-none');
+        } else {
+            document.getElementById('submitQuiz').classList.remove('d-none');
+        }
+    }
+
+    function submitQuiz() {
+        // Calculate results
+        const results = {
+            total: currentQuestions.length,
+            correct: userAnswers.filter((answer, index) => answer === currentQuestions[index].correct_answer).length,
+            answers: userAnswers,
+            questions: currentQuestions  // Include questions for detailed feedback
+        };
+        
+        // Store results in session storage
+        sessionStorage.setItem('quizResults', JSON.stringify(results));
+        
+        // Redirect to results page
+        window.location.href = '/results';
+    }
+
+    function nextQuestion() {
+        if (currentIndex < currentQuestions.length - 1) {
+            currentIndex++;
+            displayQuestion(currentIndex);
+        }
+    }
+
+    function finishQuiz() {
+        // Calculate and store results
+        const results = {
+            total: currentQuestions.length,
+            correct: userAnswers.filter((answer, index) => answer === currentQuestions[index].correct_answer).length,
+            answers: userAnswers
+        };
+        sessionStorage.setItem('quizResults', JSON.stringify(results));
+        window.location.href = '/results';
+    }
+
+    // Event listeners
+    document.getElementById('checkAnswer').addEventListener('click', checkAnswer);
+    document.getElementById('nextQuestion').addEventListener('click', nextQuestion);
+    document.getElementById('submitQuiz').addEventListener('click', submitQuiz);
+
+    // Initialize first question
+    if (currentQuestions.length > 0) {
+        displayQuestion(0);
+    } else {
+        window.location.href = '/';
+    }
+});
+</script>
+
+<style>
+.correct-answer {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-color: #28a745;
+}
+
+.incorrect-answer {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: #dc3545;
+}
+
+.option-item {
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.option-item:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.progress-info {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#explanation {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}

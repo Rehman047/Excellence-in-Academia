@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Excellence in Academia - Upload Materials{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Upload Study Materials</h2>
+                </div>
+                <div class="card-body">
+                    <div class="upload-area" id="uploadArea">
+                        <form id="uploadForm" class="text-center">
+                            <div class="mb-4">
+                                <i class="fas fa-cloud-upload-alt fa-3x" style="color: #ff6b00;"></i>
+                                <p class="mt-3 text-light">Drag and drop your files here or click to select</p>
+                                <input type="file" id="fileInput" class="d-none" accept=".pdf,.pptx,.docx,.txt">
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                    Select File
+                                </button>
+                            </div>
+                            <div class="mb-4">
+                                <label for="numQuestions" class="form-label">Number of Questions:</label>
+                                <input type="number" class="form-control" id="numQuestions" min="5" max="20" value="10">
+                                <small class="text-light">Choose between 5 and 20 questions</small>
+                            </div>
+                            <div id="fileList" class="mt-3"></div>
+                        </form>
+                    </div>
+                    
+                    <div id="processingStatus" class="mt-4 d-none">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-center mt-2" id="statusText">Processing file...</p>
+                    </div>
+
+                    <div id="quizSection" class="mt-4 d-none">
+                        <h3 class="mb-3">Practice Questions</h3>
+                        <div id="questionContainer"></div>
+                        <div class="text-center mt-4">
+                            <button id="submitQuiz" class="btn btn-success d-none">Submit Quiz</button>
+                            <button id="nextQuestion" class="btn btn-primary">Next Question</button>
+                        </div>
+                    </div>
+
+                    <div id="results" class="mt-4 d-none">
+                        <h3>Quiz Results</h3>
+                        <div class="card">
+                            <div class="card-body">
+                                <h4 class="mb-3">Score: <span id="scoreDisplay"></span></h4>
+                                <div id="incorrectAnswers"></div>
+                                <div class="text-center mt-4">
+                                    <button id="tryAgain" class="btn btn-primary">Try Another Quiz</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentQuestions = [];
+let currentQuestionIndex = 0;
+let userAnswers = [];
+
+// File Upload Handling
+document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+document.getElementById('uploadArea').addEventListener('dragover', handleDragOver);
+document.getElementById('uploadArea').addEventListener('drop', handleFileDrop);
+document.getElementById('nextQuestion').addEventListener('click', showNextQuestion);
+document.getElementById('submitQuiz').addEventListener('click', submitQuiz);
+document.getElementById('tryAgain').addEventListener('click', resetQuiz);
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        uploadFile(file);
+    }
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function handleFileDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const file = event.dataTransfer.files[0];
+    if (file) {
+        uploadFile(file);
+    }
+}
+
+function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Show processing status
+    document.getElementById('processingStatus').classList.remove('d-none');
+    document.getElementById('statusText').textContent = 'Uploading file...';
+    updateProgress(20);
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateProgress(50);
+            document.getElementById('statusText').textContent = 'Generating questions...';
+            const numQuestions = parseInt(document.getElementById('numQuestions').value);
+            return fetch('/generate-questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    num_questions: numQuestions
+                })
+            });
+        }
+        throw new Error(data.error || 'Upload failed');
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateProgress(100);
+            setTimeout(() => {
+                document.getElementById('processingStatus').classList.add('d-none');
+                // Store questions in session storage for quiz
+                sessionStorage.setItem('questions', JSON.stringify(data.questions));
+                // Redirect to quiz page
+                window.location.href = '/quiz';
+            }, 500);
+        } else {
+            throw new Error(data.error || 'Question generation failed');
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+        document.getElementById('processingStatus').classList.add('d-none');
+    });
+}
+
+function updateProgress(percentage) {
+    document.querySelector('.progress-bar').style.width = percentage + '%';
+}
+
+function startQuiz(questions) {
+    currentQuestions = questions;
+    currentQuestionIndex = 0;
+    userAnswers = [];
+    document.getElementById('quizSection').classList.remove('d-none');
+    showQuestion(0);
+}
+
+function showQuestion(index) {
+    const question = currentQuestions[index];
+    const container = document.getElementById('questionContainer');
+    
+    container.innerHTML = `
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Question ${index + 1} of ${currentQuestions.length}</h5>
+                <p class="card-text">${question.question}</p>
+                <div class="options">
+                    ${question.options.map((option, i) => `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="question${index}" value="${i}" id="option${i}">
+                            <label class="form-check-label" for="option${i}">
+                                ${option}
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Show/hide buttons based on question index
+    document.getElementById('nextQuestion').style.display = 
+        index < currentQuestions.length - 1 ? 'inline-block' : 'none';
+    document.getElementById('submitQuiz').style.display = 
+        index === currentQuestions.length - 1 ? 'inline-block' : 'none';
+}
+
+function showNextQuestion() {
+    // Save current answer
+    const selectedOption = document.querySelector(`input[name="question${currentQuestionIndex}"]:checked`);
+    if (selectedOption) {
+        userAnswers[currentQuestionIndex] = parseInt(selectedOption.value);
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentQuestions.length) {
+            showQuestion(currentQuestionIndex);
+        }
+    } else {
+        alert('Please select an answer before proceeding.');
+    }
+}
+
+function submitQuiz() {
+    // Save last answer
+    const selectedOption = document.querySelector(`input[name="question${currentQuestionIndex}"]:checked`);
+    if (!selectedOption) {
+        alert('Please select an answer before submitting.');
+        return;
+    }
+    userAnswers[currentQuestionIndex] = parseInt(selectedOption.value);
+
+    // Calculate results
+    const results = calculateResults();
+    displayResults(results);
+}
+
+function calculateResults() {
+    let correct = 0;
+    const incorrect = [];
+
+    currentQuestions.forEach((question, index) => {
+        if (userAnswers[index] === question.correct_answer) {
+            correct++;
+        } else {
+            incorrect.push({
+                question: question.question,
+                userAnswer: question.options[userAnswers[index]],
+                correctAnswer: question.options[question.correct_answer],
+                explanation: question.explanation
+            });
+        }
+    });
+
+    return {
+        total: currentQuestions.length,
+        correct: correct,
+        percentage: (correct / currentQuestions.length * 100).toFixed(1),
+        incorrect: incorrect
+    };
+}
+
+function displayResults(results) {
+    document.getElementById('quizSection').classList.add('d-none');
+    document.getElementById('results').classList.remove('d-none');
+    
+    document.getElementById('scoreDisplay').textContent = 
+        `${results.correct}/${results.total} (${results.percentage}%)`;
+
+    const incorrectContainer = document.getElementById('incorrectAnswers');
+    incorrectContainer.innerHTML = results.incorrect.map(item => `
+        <div class="alert alert-danger mb-3" style="background-color: #2a2a2a; border-color: #ff0000; color: white;">
+            <p><strong>Question:</strong> ${item.question}</p>
+            <p><strong>Your Answer:</strong> ${item.userAnswer}</p>
+            <p><strong>Correct Answer:</strong> ${item.correctAnswer}</p>
+            <p><strong>Explanation:</strong> ${item.explanation}</p>
+        </div>
+    `).join('');
+}
+
+function resetQuiz() {
+    document.getElementById('results').classList.add('d-none');
+    document.getElementById('uploadForm').reset();
+    document.getElementById('fileList').innerHTML = '';
+    currentQuestions = [];
+    currentQuestionIndex = 0;
+    userAnswers = [];
+}
+</script>
+{% endblock %}

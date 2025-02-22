@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Excellence in Academia - Quiz Results{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Your Quiz Results</h2>
+                </div>
+                <div class="card-body">
+                    <div id="resultsContainer">
+                        <div class="text-center mb-4">
+                            <div class="score-circle">
+                                <span id="scorePercentage">0%</span>
+                            </div>
+                            <h3 class="mt-3">Score: <span id="scoreText">0/0</span></h3>
+                        </div>
+
+                        <div class="performance-summary mb-4">
+                            <h4>Performance Summary</h4>
+                <div class="progress mb-3" style="height: 20px; background-color: #2a2a2a;">
+                    <div id="correctProgress" class="progress-bar" role="progressbar" style="background-color: #ff6b00;"></div>
+                    <div id="incorrectProgress" class="progress-bar" role="progressbar" style="background-color: #ff0000;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-success">
+                                    <i class="fas fa-check-circle"></i> 
+                                    Correct: <span id="correctCount">0</span>
+                                </span>
+                                <span class="text-danger">
+                                    <i class="fas fa-times-circle"></i> 
+                                    Incorrect: <span id="incorrectCount">0</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div id="incorrectAnswers">
+                            <h4>Review Incorrect Answers</h4>
+                            <div id="incorrectQuestionsList"></div>
+                        </div>
+
+                        <div id="feedbackMessage" class="mt-4">
+                            <!-- Feedback message will be displayed here -->
+                        </div>
+
+                        <div class="readiness-assessment mt-4 p-3 rounded">
+                            <h4>Readiness Assessment</h4>
+                            <div id="readinessMessage" class="alert">
+                                <!-- Dynamically filled based on score -->
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <button id="tryAgain" class="btn btn-primary me-2">Try Another Quiz</button>
+                            <button id="uploadMore" class="btn btn-success">Upload More Material</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const results = JSON.parse(sessionStorage.getItem('quizResults') || '{}');
+    const questions = JSON.parse(sessionStorage.getItem('questions') || '[]');
+    
+    if (!results.total || !questions.length) {
+        window.location.href = '/';
+        return;
+    }
+
+    // Calculate scores
+    const percentage = Math.round((results.correct / results.total) * 100);
+    const incorrect = results.total - results.correct;
+
+    // Update UI elements
+    document.getElementById('scorePercentage').textContent = percentage + '%';
+    document.getElementById('scoreText').textContent = `${results.correct}/${results.total}`;
+    document.getElementById('correctCount').textContent = results.correct;
+    document.getElementById('incorrectCount').textContent = incorrect;
+
+    // Update progress bars
+    document.getElementById('correctProgress').style.width = `${(results.correct / results.total) * 100}%`;
+    document.getElementById('incorrectProgress').style.width = `${(incorrect / results.total) * 100}%`;
+
+    // Display incorrect answers with detailed feedback
+    const incorrectList = document.getElementById('incorrectQuestionsList');
+    results.answers.forEach((answer, index) => {
+        const question = questions[index];
+        if (answer !== question.correct_answer) {
+            const div = document.createElement('div');
+            div.className = 'alert incorrect-answer mb-3';
+            div.innerHTML = `
+                <h5>Question ${index + 1}:</h5>
+                <p>${question.question}</p>
+                <p class="text-danger">Your Answer: ${question.options[answer]}</p>
+                <p class="text-success">Correct Answer: ${question.options[question.correct_answer]}</p>
+                <div class="mt-2">
+                    <strong>Explanation:</strong>
+                    <p>${question.explanation}</p>
+                </div>
+                <div class="mt-2">
+                    <strong>Context:</strong>
+                    <p>${question.context}</p>
+                </div>
+            `;
+            incorrectList.appendChild(div);
+        }
+    });
+
+    // Set readiness message
+    const readinessDiv = document.getElementById('readinessMessage');
+    if (percentage >= 90) {
+        readinessDiv.className = 'alert alert-success';
+        readinessDiv.innerHTML = `
+            <i class="fas fa-star"></i>
+            <strong>Excellent!</strong> You're well-prepared and ready for the exam.
+        `;
+    } else if (percentage >= 70) {
+        readinessDiv.className = 'alert alert-info';
+        readinessDiv.innerHTML = `
+            <i class="fas fa-thumbs-up"></i>
+            <strong>Good progress!</strong> Review the incorrect answers and try another quiz to improve further.
+        `;
+    } else {
+        readinessDiv.className = 'alert alert-warning';
+        readinessDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>More practice needed.</strong> Focus on the topics you got wrong and try again.
+        `;
+    }
+
+    // Display feedback message based on performance
+    const feedbackMessage = document.getElementById('feedbackMessage');
+    if (percentage >= 90) {
+        feedbackMessage.innerHTML = `
+            <div class="alert alert-success" style="background-color: #2a2a2a; border-color: #ff6b00; color: white;">
+                <h5><i class="fas fa-trophy"></i> Outstanding Performance!</h5>
+                <p>You've demonstrated excellent understanding of the material. Consider challenging yourself with more advanced topics!</p>
+            </div>`;
+    } else if (percentage >= 70) {
+        feedbackMessage.innerHTML = `
+            <div class="alert alert-info" style="background-color: #2a2a2a; border-color: #ff6b00; color: white;">
+                <h5><i class="fas fa-chart-line"></i> Good Progress!</h5>
+                <p>You're on the right track! Focus on the topics you missed to improve your understanding further.</p>
+            </div>`;
+    } else {
+        feedbackMessage.innerHTML = `
+            <div class="alert alert-warning" style="background-color: #2a2a2a; border-color: #ff6b00; color: white;">
+                <h5><i class="fas fa-book"></i> Keep Learning!</h5>
+                <p>Don't be discouraged! Review the material, focus on understanding the explanations, and try again. Practice makes perfect!</p>
+            </div>`;
+    }
+    
+    // Button event listeners
+    document.getElementById('tryAgain').addEventListener('click', function() {
+        window.location.href = '/quiz';
+    });
+
+    document.getElementById('uploadMore').addEventListener('click', function() {
+        window.location.href = '/';
+    });
+});
+</script>
+
+<style>
+.score-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    border: 10px solid #ff6b00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.score-circle span {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #ff6b00;
+}
+
+.performance-summary {
+    background-color: #2a2a2a;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 1px solid #ff6b00;
+}
+
+.readiness-assessment {
+    background-color: #2a2a2a;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 1px solid #ff6b00;
+}
+
+.alert {
+    border-left-width: 4px;
+    margin-bottom: 1rem;
+}
+
+.incorrect-answer {
+    background-color: #2a2a2a;
+    border: 1px solid #ff0000;
+    color: #ffffff;
+    border-left-color: #ff0000;
+    border-left-width: 4px;
+}
+
+.alert-success {
+    border-left-color: #28a745;
+}
+
+.alert-info {
+    border-left-color: #17a2b8;
+}
+
+.alert-warning {
+    border-left-color: #ffc107;
+}
+
+#incorrectQuestionsList .alert {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .score-circle {
+        width: 120px;
+        height: 120px;
+        border-width: 8px;
+    }
+
+    .score-circle span {
+        font-size: 2rem;
+    }
+}
+</style>
+{% endblock %}
